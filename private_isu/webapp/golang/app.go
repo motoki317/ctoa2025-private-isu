@@ -177,125 +177,35 @@ var usersCache = sc.NewMust(func(ctx context.Context, userID int) (User, error) 
 	return user, nil
 }, time.Hour, time.Hour, sc.EnableStrictCoalescing())
 
+var commentsCache = sc.NewMust(func(ctx context.Context, postID int) ([]Comment, error) {
+	var comments []Comment
+	err := db.Select(&comments, "SELECT * FROM `comments` WHERE `post_id` = ? ORDER BY `created_at` DESC", postID)
+	if err != nil {
+		return nil, err
+	}
+	return comments, nil
+}, time.Hour, time.Hour, sc.EnableStrictCoalescing())
+
 func makePosts(results []Post, allComments bool) ([]Post, error) {
 	if len(results) == 0 {
 		return []Post{}, nil
 	}
 
-	// Collect all post IDs and user IDs
-	postIDs := make([]int, len(results))
-	userIDs := make([]int, len(results))
-	for i, p := range results {
-		postIDs[i] = p.ID
-		userIDs[i] = p.UserID
-	}
-
-	// Build placeholders for IN queries
-	postPlaceholders := make([]string, len(postIDs))
-	for i := range postPlaceholders {
-		postPlaceholders[i] = "?"
-	}
-	postPlaceholderStr := strings.Join(postPlaceholders, ",")
-
-	// Create maps to store results
-	commentCountMap := make(map[int]int)
-	postCommentsMap := make(map[int][]Comment)
-
-	// Batch query: Get comment counts for all posts
-	type CountResult struct {
-		PostID int `db:"post_id"`
-		Count  int `db:"count"`
-	}
-	countQuery := fmt.Sprintf("SELECT `post_id`, COUNT(*) AS `count` FROM `comments` WHERE `post_id` IN (%s) GROUP BY `post_id`", postPlaceholderStr)
-	args := make([]interface{}, len(postIDs))
-	for i, v := range postIDs {
-		args[i] = v
-	}
-
-	var counts []CountResult
-	err := db.Select(&counts, countQuery, args...)
-	if err != nil {
-		return nil, err
-	}
-	for _, c := range counts {
-		commentCountMap[c.PostID] = c.Count
-	}
-	// Initialize zero counts for posts without comments
-	for _, pid := range postIDs {
-		if _, exists := commentCountMap[pid]; !exists {
-			commentCountMap[pid] = 0
-		}
-	}
-
-	// Batch query: Get comments for all posts
-	commentsQuery := fmt.Sprintf("SELECT * FROM `comments` WHERE `post_id` IN (%s) ORDER BY `post_id`, `created_at` DESC", postPlaceholderStr)
-
-	args = make([]interface{}, len(postIDs))
-	for i, v := range postIDs {
-		args[i] = v
-	}
-
-	var allCommentsList []Comment
-	err = db.Select(&allCommentsList, commentsQuery, args...)
-	if err != nil {
-		return nil, err
-	}
-
-	// If we need to limit comments, do it in Go
-	if !allComments {
-		tempCommentsMap := make(map[int][]Comment)
-		for _, c := range allCommentsList {
-			tempCommentsMap[c.PostID] = append(tempCommentsMap[c.PostID], c)
-		}
-
-		allCommentsList = []Comment{}
-		for _, comments := range tempCommentsMap {
-			limit := 3
-			if len(comments) < limit {
-				limit = len(comments)
-			}
-			allCommentsList = append(allCommentsList, comments[:limit]...)
-		}
-	}
-
-	// Collect all comment user IDs
-	commentUserIDs := make(map[int]bool)
-	for _, c := range allCommentsList {
-		commentUserIDs[c.UserID] = true
-		if _, exists := postCommentsMap[c.PostID]; !exists {
-			postCommentsMap[c.PostID] = []Comment{}
-		}
-		postCommentsMap[c.PostID] = append(postCommentsMap[c.PostID], c)
-	}
-
-	// Batch query: Get all comment authors
-	if len(commentUserIDs) > 0 {
-		// Assign users to comments
-		for postID, comments := range postCommentsMap {
-			for i := range comments {
-				user, err := usersCache.Get(context.Background(), comments[i].UserID)
-				if err != nil {
-					return nil, err
-				}
-				comments[i].User = user
-			}
-			postCommentsMap[postID] = comments
-		}
-	}
-
-	// Build final posts array
 	var posts []Post
 	for _, p := range results {
-		p.CommentCount = commentCountMap[p.ID]
+		comments, err := commentsCache.Get(context.Background(), p.ID)
+		if err != nil {
+			return nil, err
+		}
+		p.CommentCount = len(comments)
 
-		if comments, exists := postCommentsMap[p.ID]; exists {
-			// reverse comments to get chronological order
-			for i, j := 0, len(comments)-1; i < j; i, j = i+1, j-1 {
-				comments[i], comments[j] = comments[j], comments[i]
-			}
+		if allComments {
 			p.Comments = comments
 		} else {
-			p.Comments = []Comment{}
+			p.Comments = comments[:min(3, len(comments))]
+		}
+		if len(p.Comments) == 0 {
+			p.Comments = []Comment{} // nullにならないよう一応
 		}
 
 		user, err := usersCache.Get(context.Background(), p.UserID)
@@ -827,6 +737,7 @@ func postComment(w http.ResponseWriter, r *http.Request) {
 		log.Print(err)
 		return
 	}
+	commentsCache.Forget(postID)
 
 	http.Redirect(w, r, fmt.Sprintf("/posts/%d", postID), http.StatusFound)
 }
