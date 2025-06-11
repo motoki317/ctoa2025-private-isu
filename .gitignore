@@ -1,0 +1,42 @@
+.vscode
+.idea
+
+.*
+!.gitignore
+!.gitkeep
+
+tmp
+pprof
+fgprof
+
+bin
+go
+local
+
+dump/
+
+# Go言語以外のファイルは基本載せない
+webapp
+!webapp/go
+
+# 環境変数のファイル名に合わせること
+.env
+!s1/home/isucon/.env
+!s2/home/isucon/.env
+!s3/home/isucon/.env
+!s4/home/isucon/.env
+!s5/home/isucon/.env
+
+env
+!s1/home/isucon/env
+!s2/home/isucon/env
+!s3/home/isucon/env
+!s4/home/isucon/env
+!s5/home/isucon/env
+
+share/keys/*
+!/share/keys/.gitkeep
+!share/keys/id_ed25519.pub
+!share/keys/id_ed25519.enc
+
+# Note: テーブル定義のSQLファイルは適宜gitに乗せること
