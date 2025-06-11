@@ -133,13 +133,21 @@ func getSession(r *http.Request) *sessions.Session {
 
 func getSessionUser(r *http.Request) User {
 	session := getSession(r)
-	uid, ok := session.Values["user_id"]
-	if !ok || uid == nil {
+	uidI, ok := session.Values["user_id"]
+	if !ok || uidI == nil {
 		return User{}
 	}
 
-	uidFixed := uid.(int64)
-	u, err := usersCache.Get(context.Background(), int(uidFixed))
+	var uid int
+	switch v := uidI.(type) {
+	case int:
+		uid = v
+	case int64:
+		uid = int(v)
+	default:
+		panic(fmt.Sprintf("unknown type: %+s", v))
+	}
+	u, err := usersCache.Get(context.Background(), uid)
 	if err != nil {
 		log.Print(err)
 		return User{}
