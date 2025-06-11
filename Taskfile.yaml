@@ -96,7 +96,7 @@ tasks:
       - task: build
       - task: restart
       - task: sleep
-      # - task: send-bench
+      - task: send-bench
       - task: log
 
   prof:
