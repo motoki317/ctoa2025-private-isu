@@ -449,7 +449,8 @@ tasks:
   log:
     desc: アプリのログを見る
     cmds:
-      - sudo journalctl -u {{.SERVICE_NAME}} -n20 -f
+      # - sudo journalctl -u {{.SERVICE_NAME}} -n20 -f
+      - sudo journalctl -n20 -f
 
   check-commit:
     cmds:
