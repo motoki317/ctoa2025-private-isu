@@ -811,11 +811,6 @@ func main() {
 	}
 	defer db.Close()
 
-	if os.Getenv("DUMP_IMAGES") == "1" {
-		dumpImage(db)
-		return
-	}
-
 	r := chi.NewRouter()
 
 	r.Get("/initialize", getInitialize)
