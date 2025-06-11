@@ -652,6 +652,16 @@ func getPosts(w http.ResponseWriter, r *http.Request) {
 	)).Execute(w, posts)
 }
 
+var postIDCache = sc.NewMust(func(ctx context.Context, postID int) (Post, error) {
+	var post Post
+	err := db.Get(&post, "SELECT * FROM `posts` WHERE `id` = ?", postID)
+	if err != nil {
+		log.Print(err)
+		return Post{}, err
+	}
+	return post, nil
+}, time.Hour, time.Hour, sc.EnableStrictCoalescing())
+
 func getPostsID(w http.ResponseWriter, r *http.Request) {
 	pidStr := r.PathValue("id")
 	pid, err := strconv.Atoi(pidStr)
@@ -660,14 +670,13 @@ func getPostsID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	results := []Post{}
-	err = db.Select(&results, "SELECT * FROM `posts` WHERE `id` = ? LIMIT ?", pid, postsPerPage)
+	post, err := postIDCache.Get(context.Background(), pid)
 	if err != nil {
 		log.Print(err)
 		return
 	}
 
-	posts, err := makePosts(results, getCSRFToken(r), true)
+	posts, err := makePosts([]Post{post}, getCSRFToken(r), true)
 	if err != nil {
 		log.Print(err)
 		return
@@ -788,6 +797,7 @@ func postIndex(w http.ResponseWriter, r *http.Request) {
 		log.Print(err)
 		return
 	}
+	postIDCache.Forget(int(pid))
 
 	http.Redirect(w, r, "/posts/"+strconv.FormatInt(pid, 10), http.StatusFound)
 }
