@@ -138,7 +138,8 @@ func getSessionUser(r *http.Request) User {
 		return User{}
 	}
 
-	u, err := usersCache.Get(context.Background(), int(uid.(int64)))
+	uidFixed := uid.(int64)
+	u, err := usersCache.Get(context.Background(), int(uidFixed))
 	if err != nil {
 		log.Print(err)
 		return User{}
@@ -386,7 +387,7 @@ func postLogin(w http.ResponseWriter, r *http.Request) {
 
 	if u != nil {
 		session := getSession(r)
-		session.Values["user_id"] = u.ID
+		session.Values["user_id"] = int64(u.ID)
 		session.Values["csrf_token"] = secureRandomStr(16)
 		session.Save(r, w)
 
