@@ -443,7 +443,7 @@ tasks:
       - sleep 3
 
   send-bench:
-    cmd:
+    cmds:
       - 'curl https://xnvvb925bl.execute-api.ap-northeast-1.amazonaws.com/ &'
 
   log:
