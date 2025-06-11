@@ -7,6 +7,7 @@ WorkingDirectory=/home/isucon/private_isu/webapp/golang
 EnvironmentFile=/home/isucon/env.sh
 Environment=RACK_ENV=production
 PIDFile=/home/isucon/private_isu/webapp/golang/server.pid
+LimitNOFILE=65536
 
 User=isucon
 Group=isucon
