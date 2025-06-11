@@ -444,7 +444,7 @@ tasks:
 
   send-bench:
     cmd:
-      - "curl https://xnvvb925bl.execute-api.ap-northeast-1.amazonaws.com/ &"
+      - 'curl https://xnvvb925bl.execute-api.ap-northeast-1.amazonaws.com/ &'
 
   log:
     desc: アプリのログを見る
