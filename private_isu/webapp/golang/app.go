@@ -276,15 +276,10 @@ func makePosts(results []Post, csrfToken string, allComments bool) ([]Post, erro
 
 	// Batch query: Get all comment authors
 	if len(commentUserIDs) > 0 {
-		commentUserIDList := make([]int, 0, len(commentUserIDs))
-		for uid := range commentUserIDs {
-			commentUserIDList = append(commentUserIDList, uid)
-		}
-
 		// Assign users to comments
 		for postID, comments := range postCommentsMap {
 			for i := range comments {
-				user, err := usersCache.Get(context.Background(), commentUserIDList[i])
+				user, err := usersCache.Get(context.Background(), comments[i].UserID)
 				if err != nil {
 					return nil, err
 				}
