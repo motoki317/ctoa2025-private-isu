@@ -138,13 +138,11 @@ func getSessionUser(r *http.Request) User {
 		return User{}
 	}
 
-	u := User{}
-
-	err := db.Get(&u, "SELECT * FROM `users` WHERE `id` = ?", uid)
+	u, err := usersCache.Get(context.Background(), uid.(int))
 	if err != nil {
+		log.Print(err)
 		return User{}
 	}
-
 	return u
 }
 
@@ -160,6 +158,15 @@ func getFlash(w http.ResponseWriter, r *http.Request, key string) string {
 		return value.(string)
 	}
 }
+
+var usersCache = sc.NewMust(func(ctx context.Context, userID int) (User, error) {
+	var user User
+	err := db.Get(&user, "SELECT * FROM `users` WHERE `id` = ?", userID)
+	if err != nil {
+		return User{}, err
+	}
+	return user, nil
+}, time.Hour, time.Hour, sc.EnableStrictCoalescing())
 
 func makePosts(results []Post, csrfToken string, allComments bool) ([]Post, error) {
 	if len(results) == 0 {
@@ -182,25 +189,8 @@ func makePosts(results []Post, csrfToken string, allComments bool) ([]Post, erro
 	postPlaceholderStr := strings.Join(postPlaceholders, ",")
 
 	// Create maps to store results
-	postUserMap := make(map[int]User)
 	commentCountMap := make(map[int]int)
 	postCommentsMap := make(map[int][]Comment)
-
-	// Batch query: Get all post authors
-	query := fmt.Sprintf("SELECT * FROM `users` WHERE `id` IN (%s)", postPlaceholderStr)
-	args := make([]interface{}, len(userIDs))
-	for i, v := range userIDs {
-		args[i] = v
-	}
-
-	var users []User
-	err := db.Select(&users, query, args...)
-	if err != nil {
-		return nil, err
-	}
-	for _, u := range users {
-		postUserMap[u.ID] = u
-	}
 
 	// Batch query: Get comment counts for all posts
 	type CountResult struct {
@@ -208,13 +198,13 @@ func makePosts(results []Post, csrfToken string, allComments bool) ([]Post, erro
 		Count  int `db:"count"`
 	}
 	countQuery := fmt.Sprintf("SELECT `post_id`, COUNT(*) AS `count` FROM `comments` WHERE `post_id` IN (%s) GROUP BY `post_id`", postPlaceholderStr)
-	args = make([]interface{}, len(postIDs))
+	args := make([]interface{}, len(postIDs))
 	for i, v := range postIDs {
 		args[i] = v
 	}
 
 	var counts []CountResult
-	err = db.Select(&counts, countQuery, args...)
+	err := db.Select(&counts, countQuery, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -282,35 +272,14 @@ func makePosts(results []Post, csrfToken string, allComments bool) ([]Post, erro
 			commentUserIDList = append(commentUserIDList, uid)
 		}
 
-		userPlaceholders := make([]string, len(commentUserIDList))
-		for i := range userPlaceholders {
-			userPlaceholders[i] = "?"
-		}
-		userPlaceholderStr := strings.Join(userPlaceholders, ",")
-
-		userQuery := fmt.Sprintf("SELECT * FROM `users` WHERE `id` IN (%s)", userPlaceholderStr)
-		args = make([]interface{}, len(commentUserIDList))
-		for i, v := range commentUserIDList {
-			args[i] = v
-		}
-
-		var commentUsers []User
-		err = db.Select(&commentUsers, userQuery, args...)
-		if err != nil {
-			return nil, err
-		}
-
-		commentUserMap := make(map[int]User)
-		for _, u := range commentUsers {
-			commentUserMap[u.ID] = u
-		}
-
 		// Assign users to comments
 		for postID, comments := range postCommentsMap {
 			for i := range comments {
-				if user, exists := commentUserMap[comments[i].UserID]; exists {
-					comments[i].User = user
+				user, err := usersCache.Get(context.Background(), commentUserIDList[i])
+				if err != nil {
+					return nil, err
 				}
+				comments[i].User = user
 			}
 			postCommentsMap[postID] = comments
 		}
@@ -331,9 +300,11 @@ func makePosts(results []Post, csrfToken string, allComments bool) ([]Post, erro
 			p.Comments = []Comment{}
 		}
 
-		if user, exists := postUserMap[p.UserID]; exists {
-			p.User = user
+		user, err := usersCache.Get(context.Background(), p.UserID)
+		if err != nil {
+			return nil, err
 		}
+		p.User = user
 
 		p.CSRFToken = csrfToken
 
@@ -491,6 +462,7 @@ func postRegister(w http.ResponseWriter, r *http.Request) {
 	session.Values["user_id"] = uid
 	session.Values["csrf_token"] = secureRandomStr(16)
 	session.Save(r, w)
+	usersCache.Forget(int(uid))
 
 	http.Redirect(w, r, "/", http.StatusFound)
 }
