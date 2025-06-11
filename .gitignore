@@ -1,3 +1,6 @@
+backup/
+private_isu/benchmarker/userdata
+
 .vscode
 .idea
 
@@ -16,8 +19,8 @@ local
 dump/
 
 # Go言語以外のファイルは基本載せない
-webapp
-!webapp/go
+# webapp
+# !webapp/golang
 
 # 環境変数のファイル名に合わせること
 .env
