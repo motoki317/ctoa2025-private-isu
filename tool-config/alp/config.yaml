@@ -20,7 +20,10 @@ matching_groups:            # array
   - ^/user/\w+/home$
   - ^/admin/user/\w+$
   - ^/admin/user/\w+/ban$
-
+  - ^/posts/.+$
+  - ^/posts.+$
+  - ^/image/.+$
+  - ^/@.+$
 
 # file:                       # string
 # query_string_ignore_values: # boolean
