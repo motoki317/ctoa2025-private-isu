@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	crand "crypto/rand"
 	"crypto/sha512"
 	"encoding/hex"
@@ -23,6 +24,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gorilla/sessions"
 	"github.com/jmoiron/sqlx"
+	"github.com/motoki317/sc"
 )
 
 var (
@@ -502,17 +504,20 @@ func getLogout(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusFound)
 }
 
-func getIndex(w http.ResponseWriter, r *http.Request) {
-	me := getSessionUser(r)
-
+var postsCache = sc.NewMust(func(ctx context.Context, key struct{}) ([]Post, error) {
 	results := []Post{}
-
 	err := db.Select(&results, "SELECT `id`, `user_id`, `body`, `mime`, `created_at` FROM `posts` ORDER BY `created_at` DESC LIMIT ?", postsPerPage)
 	if err != nil {
 		log.Print(err)
-		return
+		return nil, err
 	}
+	return results, nil
+}, 0, 0, sc.EnableStrictCoalescing())
 
+func getIndex(w http.ResponseWriter, r *http.Request) {
+	me := getSessionUser(r)
+
+	results, err := postsCache.Get(context.Background(), struct{}{})
 	posts, err := makePosts(results, getCSRFToken(r), false)
 	if err != nil {
 		log.Print(err)
@@ -787,6 +792,7 @@ func postIndex(w http.ResponseWriter, r *http.Request) {
 		log.Print(err)
 		return
 	}
+	postsCache.Purge()
 
 	lastInsertId, err := result.LastInsertId()
 	if err != nil {
