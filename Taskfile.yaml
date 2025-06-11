@@ -4,7 +4,7 @@ vars:
   # 問題に応じて設定する必要がある変数
   USER: isucon
   BIN_NAME: app
-  BUILD_DIR: /home/ubuntu/private_isu/webapp/golang
+  BUILD_DIR: /home/isucon/private_isu/webapp/golang
   SERVICE_NAME: isu-go.service
   ENV_FILE: env
 
@@ -95,6 +95,8 @@ tasks:
       - task: deploy-conf
       - task: build
       - task: restart
+      - task: sleep
+      # - task: send-bench
       - task: log
 
   prof:
@@ -435,6 +437,14 @@ tasks:
       - sudo systemctl restart nginx
       # 特定のサーバーでだけ実行したい場合の例
       # - sh -c "if [ $SERVER_ID = "s1" ]; then (sudo systemctl restart nginx) fi"
+
+  sleep:
+    cmds:
+      - sleep 3
+
+  send-bench:
+    cmd:
+      - curl https://xnvvb925bl.execute-api.ap-northeast-1.amazonaws.com/ &
 
   log:
     desc: アプリのログを見る
