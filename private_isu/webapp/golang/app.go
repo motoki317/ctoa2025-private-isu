@@ -488,7 +488,7 @@ var postsCache = sc.NewMust(func(ctx context.Context, key struct{}) ([]Post, err
 		return nil, err
 	}
 	return results, nil
-}, 0, 0, sc.EnableStrictCoalescing())
+}, time.Hour, time.Hour, sc.EnableStrictCoalescing())
 
 func getIndex(w http.ResponseWriter, r *http.Request) {
 	me := getSessionUser(r)
