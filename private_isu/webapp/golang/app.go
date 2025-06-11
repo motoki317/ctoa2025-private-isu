@@ -613,16 +613,20 @@ func postIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	suffix := ""
 	mime := ""
 	if file != nil {
 		// 投稿のContent-Typeからファイルのタイプを決定する
 		contentType := header.Header["Content-Type"][0]
 		if strings.Contains(contentType, "jpeg") {
 			mime = "image/jpeg"
+			suffix = ".jpg"
 		} else if strings.Contains(contentType, "png") {
 			mime = "image/png"
+			suffix = ".png"
 		} else if strings.Contains(contentType, "gif") {
 			mime = "image/gif"
+			suffix = ".gif"
 		} else {
 			session := getSession(r)
 			session.Values["notice"] = "投稿できる画像形式はjpgとpngとgifだけです"
@@ -656,6 +660,18 @@ func postIndex(w http.ResponseWriter, r *http.Request) {
 		filedata,
 		r.FormValue("body"),
 	)
+	if err != nil {
+		log.Print(err)
+		return
+	}
+
+	lastInsertId, err := result.LastInsertId()
+	if err != nil {
+		log.Print(err)
+		return
+	}
+	imgFilename := fmt.Sprintf("%s/%d%s", imageBaseDir, lastInsertId, suffix)
+	err = os.WriteFile(imgFilename, filedata, 0644)
 	if err != nil {
 		log.Print(err)
 		return
@@ -828,6 +844,11 @@ func main() {
 		log.Fatalf("Failed to connect to DB: %s.", err.Error())
 	}
 	defer db.Close()
+
+	if os.Getenv("DUMP_IMAGES") == "1" {
+		dumpImage(db)
+		return
+	}
 
 	r := chi.NewRouter()
 
