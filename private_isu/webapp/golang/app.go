@@ -177,7 +177,7 @@ var usersCache = sc.NewMust(func(ctx context.Context, userID int) (User, error) 
 	return user, nil
 }, time.Hour, time.Hour, sc.EnableStrictCoalescing())
 
-func makePosts(results []Post, csrfToken string, allComments bool) ([]Post, error) {
+func makePosts(results []Post, allComments bool) ([]Post, error) {
 	if len(results) == 0 {
 		return []Post{}, nil
 	}
@@ -228,13 +228,7 @@ func makePosts(results []Post, csrfToken string, allComments bool) ([]Post, erro
 	}
 
 	// Batch query: Get comments for all posts
-	var commentsQuery string
-	if allComments {
-		commentsQuery = fmt.Sprintf("SELECT * FROM `comments` WHERE `post_id` IN (%s) ORDER BY `post_id`, `created_at` DESC", postPlaceholderStr)
-	} else {
-		// For limited comments, get all and filter in Go
-		commentsQuery = fmt.Sprintf("SELECT * FROM `comments` WHERE `post_id` IN (%s) ORDER BY `post_id`, `created_at` DESC", postPlaceholderStr)
-	}
+	commentsQuery := fmt.Sprintf("SELECT * FROM `comments` WHERE `post_id` IN (%s) ORDER BY `post_id`, `created_at` DESC", postPlaceholderStr)
 
 	args = make([]interface{}, len(postIDs))
 	for i, v := range postIDs {
@@ -309,8 +303,6 @@ func makePosts(results []Post, csrfToken string, allComments bool) ([]Post, erro
 			return nil, err
 		}
 		p.User = user
-
-		p.CSRFToken = csrfToken
 
 		if p.User.DelFlg == 0 {
 			posts = append(posts, p)
@@ -487,17 +479,20 @@ var postsCache = sc.NewMust(func(ctx context.Context, key struct{}) ([]Post, err
 		log.Print(err)
 		return nil, err
 	}
-	return results, nil
+	return makePosts(results, false)
 }, time.Hour, time.Hour, sc.EnableStrictCoalescing())
 
 func getIndex(w http.ResponseWriter, r *http.Request) {
 	me := getSessionUser(r)
 
-	results, err := postsCache.Get(context.Background(), struct{}{})
-	posts, err := makePosts(results, getCSRFToken(r), false)
+	posts, err := postsCache.Get(context.Background(), struct{}{})
 	if err != nil {
 		log.Print(err)
 		return
+	}
+	csrfToken := getCSRFToken(r)
+	for i := range posts {
+		posts[i].CSRFToken = csrfToken
 	}
 
 	fmap := template.FuncMap{
@@ -543,10 +538,14 @@ func getAccountName(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	posts, err := makePosts(results, getCSRFToken(r), false)
+	posts, err := makePosts(results, false)
 	if err != nil {
 		log.Print(err)
 		return
+	}
+	csrfToken := getCSRFToken(r)
+	for i := range posts {
+		posts[i].CSRFToken = csrfToken
 	}
 
 	commentCount := 0
@@ -631,10 +630,14 @@ func getPosts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	posts, err := makePosts(results, getCSRFToken(r), false)
+	posts, err := makePosts(results, false)
 	if err != nil {
 		log.Print(err)
 		return
+	}
+	csrfToken := getCSRFToken(r)
+	for i := range posts {
+		posts[i].CSRFToken = csrfToken
 	}
 
 	if len(posts) == 0 {
@@ -652,14 +655,14 @@ func getPosts(w http.ResponseWriter, r *http.Request) {
 	)).Execute(w, posts)
 }
 
-var postIDCache = sc.NewMust(func(ctx context.Context, postID int) (Post, error) {
+var postIDCache = sc.NewMust(func(ctx context.Context, postID int) ([]Post, error) {
 	var post Post
 	err := db.Get(&post, "SELECT * FROM `posts` WHERE `id` = ?", postID)
 	if err != nil {
 		log.Print(err)
-		return Post{}, err
+		return nil, err
 	}
-	return post, nil
+	return makePosts([]Post{post}, true)
 }, time.Hour, time.Hour, sc.EnableStrictCoalescing())
 
 func getPostsID(w http.ResponseWriter, r *http.Request) {
@@ -670,16 +673,14 @@ func getPostsID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	post, err := postIDCache.Get(context.Background(), pid)
+	posts, err := postIDCache.Get(context.Background(), pid)
 	if err != nil {
 		log.Print(err)
 		return
 	}
-
-	posts, err := makePosts([]Post{post}, getCSRFToken(r), true)
-	if err != nil {
-		log.Print(err)
-		return
+	csrfToken := getCSRFToken(r)
+	for i := range posts {
+		posts[i].CSRFToken = csrfToken
 	}
 
 	if len(posts) == 0 {
