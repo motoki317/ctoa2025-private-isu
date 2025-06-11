@@ -668,7 +668,7 @@ func postIndex(w http.ResponseWriter, r *http.Request) {
 		log.Print(err)
 		return
 	}
-	const imageBaseDir = "/home/isucon/private_isu/webapp/public"
+	const imageBaseDir = "/home/isucon/private_isu/webapp/public/image"
 	imgFilename := fmt.Sprintf("%s/%d%s", imageBaseDir, lastInsertId, suffix)
 	err = os.WriteFile(imgFilename, filedata, 0644)
 	if err != nil {
