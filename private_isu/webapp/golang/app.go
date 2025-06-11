@@ -138,7 +138,7 @@ func getSessionUser(r *http.Request) User {
 		return User{}
 	}
 
-	u, err := usersCache.Get(context.Background(), uid.(int))
+	u, err := usersCache.Get(context.Background(), int(uid.(int64)))
 	if err != nil {
 		log.Print(err)
 		return User{}
