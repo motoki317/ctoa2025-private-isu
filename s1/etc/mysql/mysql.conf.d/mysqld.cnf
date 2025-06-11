@@ -28,7 +28,7 @@ innodb_log_file_size = 500MB
 innodb_log_buffer_size = 10MB
 # Dedicated write threads が、低並列な環境ではかえって性能低下をもたらす
 # 2コア以下の環境では、確実にOFFの方が高速
-innodb_log_write_threads = OFF
+# innodb_log_write_threads = OFF
 
 # 1に設定するとトランザクション単位でログを出力するが 2 を指定すると1秒間に1回ログファイルに出力するようになる
 innodb_flush_log_at_trx_commit = 0
