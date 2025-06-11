@@ -1,5 +1,6 @@
 backup/
 private_isu/benchmarker/userdata
+private_isu/webapp/public/image/
 
 .vscode
 .idea

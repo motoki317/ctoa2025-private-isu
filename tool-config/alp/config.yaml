@@ -20,8 +20,8 @@ matching_groups:            # array
   - ^/user/\w+/home$
   - ^/admin/user/\w+$
   - ^/admin/user/\w+/ban$
-  - ^/posts/.+$
-  - ^/posts.+$
+  - ^/posts/\d+$
+  - ^/posts\?max_created_at=.+$
   - ^/image/.+$
   - ^/@.+$
 
